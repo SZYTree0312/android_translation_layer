@@ -158,6 +158,10 @@ public class Settings {
 
 	public static final class Global extends NameValueTable {
 		private final static String TAG = "Settings$Global";
+
+		public static final String AUTO_TIME = "auto_time";
+		public static final String TRANSITION_ANIMATION_SCALE = "transition_animation_scale";
+
 		public static final Uri CONTENT_URI = Uri.parse("content://settings/global");
 
 		public static Uri getUriFor(String name) {
@@ -174,6 +178,8 @@ public class Settings {
 
 		protected static Integer getIntOrNull(ContentResolver content_resolver, String key) {
 			switch (key) {
+				case AUTO_TIME:
+					return 1;
 				default:
 					Slog.w(TAG, "!!!! getInt: unknown key: >" + key + "<");
 					return null;
@@ -202,6 +208,8 @@ public class Settings {
 			switch (key) {
 				case "animator_duration_scale":
 					return 1.f;
+				case TRANSITION_ANIMATION_SCALE:
+					return 0.0f;
 				default:
 					Slog.w(TAG, "!!!! getFloat: unknown key: >" + key + "<");
 					return null;

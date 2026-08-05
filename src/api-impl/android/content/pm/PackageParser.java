@@ -1326,6 +1326,11 @@ public class PackageParser {
 				mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
 				return null;
 
+			} else if (tagName.equals("queries")) {
+				// Just skip this tag
+				XmlUtils.skipCurrentTag(parser);
+				continue;
+
 			} else {
 				Slog.w(TAG, "Unknown element under <manifest>: " + parser.getName() + " at " + mArchiveSourcePath + " " + parser.getPositionDescription());
 				XmlUtils.skipCurrentTag(parser);

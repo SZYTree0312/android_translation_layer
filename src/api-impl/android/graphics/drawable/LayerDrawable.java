@@ -24,6 +24,7 @@ import android.graphics.ColorFilter;
 //import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.View;
 import java.io.IOException;
 import org.xmlpull.v1.XmlPullParser;
@@ -325,6 +326,17 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		childDrawable.mInsetT = t;
 		childDrawable.mInsetR = r;
 		childDrawable.mInsetB = b;
+	}
+
+	public void setLayerSize(int index, int w, int h) {
+		final ChildDrawable childDrawable = mLayerState.mChildren[index];
+		childDrawable.mWidth = w;
+		childDrawable.mHeight = h;
+	}
+
+	public void setLayerGravity(int index, int gravity) {
+		final ChildDrawable childDrawable = mLayerState.mChildren[index];
+		childDrawable.mGravity = gravity;
 	}
 
 	// overrides from Drawable.Callback
@@ -640,6 +652,9 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 	static class ChildDrawable {
 		public Drawable mDrawable;
 		public int mInsetL, mInsetT, mInsetR, mInsetB;
+		public int mWidth = -1;
+		public int mHeight = -1;
+		public int mGravity = Gravity.NO_GRAVITY;
 		public int mId;
 	}
 

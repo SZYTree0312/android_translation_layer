@@ -175,6 +175,8 @@ public class PopupWindow {
 
 	public void setSoftInputMode(int mode) {}
 
+	public void setClipToScreenEnabled(boolean enabled) {}
+
 	protected native long native_constructor();
 	protected native void native_setContentView(long widget, long contentView);
 	protected native void native_showAsDropDown(long widget, long anchor, int xoff, int yoff, int gravity);

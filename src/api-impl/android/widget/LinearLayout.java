@@ -1537,7 +1537,7 @@ public class LinearLayout extends ViewGroup {
 				switch (gravity & Gravity.VERTICAL_GRAVITY_MASK) {
 					case Gravity.TOP:
 						childTop = paddingTop + lp.topMargin;
-						if (childBaseline != -1) {
+						if (childBaseline != -1 && null != maxAscent) {
 							childTop += maxAscent[INDEX_TOP] - childBaseline;
 						}
 						break;
