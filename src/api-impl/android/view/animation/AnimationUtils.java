@@ -12,4 +12,8 @@ public class AnimationUtils {
 	public static Interpolator loadInterpolator(Context context, int dummy) {
 		return null;
 	}
+
+	public static LayoutAnimationController loadLayoutAnimation(Context context, int id) {
+		return new LayoutAnimationController();
+	}
 }

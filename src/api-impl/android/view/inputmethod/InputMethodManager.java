@@ -18,6 +18,8 @@ public class InputMethodManager {
 		return false;
 	}
 
+	public void toggleSoftInput(int showFlags, int hideFlags) {}
+
 	public boolean showSoftInput(View view, int flags) {
 		if (view == activeView) {
 			return nativeShowSoftInput(im_context, view.widget, null, 0);

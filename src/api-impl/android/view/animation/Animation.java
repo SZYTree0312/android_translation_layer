@@ -3,6 +3,7 @@ package android.view.animation;
 import android.os.Handler;
 
 public class Animation {
+	private long duration;
 
 	public interface AnimationListener {
 		public void onAnimationEnd(Animation animation);
@@ -12,7 +13,13 @@ public class Animation {
 
 	private AnimationListener listener;
 
-	public void setDuration(long durationMillis) {}
+	public long getDuration() {
+		return this.duration;
+	}
+
+	public void setDuration(long durationMillis) {
+		this.duration = durationMillis;
+	}
 
 	public void setInterpolator(Interpolator i) {}
 

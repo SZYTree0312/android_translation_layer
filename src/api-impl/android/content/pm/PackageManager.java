@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
@@ -1272,6 +1273,9 @@ public class PackageManager {
 	@SdkConstant(SdkConstantType.FEATURE)
 	public static final String FEATURE_WATCH = "android.hardware.type.watch";
 
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_ROTARY_ENCODER_LOW_RES = "android.hardware.rotaryencoder.lowres";
+
 	/**
 	 * Action to external storage service to clean out removed apps.
 	 * @hide
@@ -1889,6 +1893,8 @@ public class PackageManager {
 					return PERMISSION_GRANTED;
 				else
 					return PERMISSION_DENIED;
+			case Manifest.permission.ACCESS_NETWORK_STATE:
+				return PERMISSION_GRANTED;
 			default:
 				System.out.println("PackageManager.checkPermission: >" + permName + "< not handled\n");
 				return PERMISSION_DENIED;
@@ -2193,6 +2199,8 @@ public class PackageManager {
 				return System.getenv("ATL_IS_TELEVISION") != null;
 			case FEATURE_WATCH:
 				return System.getenv("ATL_IS_WATCH") != null;
+			case FEATURE_ROTARY_ENCODER_LOW_RES:
+				return false;
 			default:
 				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
 				return false;

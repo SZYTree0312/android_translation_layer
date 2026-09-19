@@ -10,6 +10,7 @@ import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Slog;
+import android.view.animation.LayoutAnimationController;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -718,4 +719,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void scheduleLayoutAnimation() {}
+
+	public void setLayoutAnimation(LayoutAnimationController controller) {}
 }
