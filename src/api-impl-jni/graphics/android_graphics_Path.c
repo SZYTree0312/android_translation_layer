@@ -214,7 +214,10 @@ JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1round_1rect(JNIEn
 JNIEXPORT void JNICALL Java_android_graphics_Path_native_1get_1bounds(JNIEnv *env, jclass this, jlong path_ptr, jobject bounds)
 {
 	graphene_rect_t rect;
-	gsk_path_get_bounds(_PTR(path_ptr), &rect);
+	// Explicitly ignoring error results, as GTK's behaviour on error
+	// is exactly what Android apps expect.
+    bool _ = gsk_path_get_bounds(_PTR(path_ptr), &rect);
+	(void)_;
 	_SET_FLOAT_FIELD(bounds, "left", rect.origin.x);
 	_SET_FLOAT_FIELD(bounds, "top", rect.origin.y);
 	_SET_FLOAT_FIELD(bounds, "right", rect.origin.x + rect.size.width);
