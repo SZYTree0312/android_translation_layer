@@ -4,6 +4,18 @@ If you try to run any random android app using the translation layer, you will m
 telling you that some class/interface/function doesn't exist. If you wish to help improve the translation layer 
 by adding support for the missing APIs (and if not you, who will), then read ahead :)
 
+##### possible case before getting implementation issues: sdk version
+
+Some applications may fail to run if the Android SDK version is lower than expected. For example, you might encounter an error like:
+
+`java.lang.IllegalStateException: Expected Android API level 21+ but was 9`
+
+To bypass this issue, you can override the SDK version by passing a JVM argument:
+
+```sh
+-X '-DBuild.VERSION.SDK_INT=21'
+```
+
 ##### simplest case: stubbing
 
 In a lot of cases, the functionality of the missing APIs is not really relevant to you. And even when it is, 
