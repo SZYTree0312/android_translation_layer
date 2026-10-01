@@ -585,6 +585,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void registerForContextMenu(View view) {}
 	public native boolean isInMultiWindowMode();
 
+	// we never put an activity into picture-in-picture, so this is always false
+	public boolean isInPictureInPictureMode() { return false; }
+
 	public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {}
 
 	public void setDisablePreviewScreenshots(boolean disable) {}

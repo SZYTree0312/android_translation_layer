@@ -11,7 +11,7 @@ public class ShortcutManager {
 		return Collections.emptyList();
 	}
 
-	// there is no launcher on desktop, so no shortcuts were ever published
+	// published shortcuts are a launcher concept that has no equivalent outside AOSP
 	public List<ShortcutInfo> getDynamicShortcuts() {
 		return Collections.emptyList();
 	}

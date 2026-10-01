@@ -8,9 +8,7 @@ import java.util.UUID;
 
 public class StorageManager {
 	// AOSP: uuid -v5 ad99aa3d-308e-4191-a200-ebcab371c0ad default
-	public static final UUID UUID_DEFAULT = UUID
-	                                            .fromString("41217664-9172-527a-b3d5-edabb50a7d69");
-
+	public static final UUID UUID_DEFAULT = UUID.fromString("41217664-9172-527a-b3d5-edabb50a7d69");
 	public StorageVolume[] getVolumeList() {
 		StorageVolume[] sVolumes = {new StorageVolume()};
 		return sVolumes;
