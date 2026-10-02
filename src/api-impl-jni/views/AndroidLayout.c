@@ -52,12 +52,28 @@ static void android_layout_measure(GtkLayoutManager *layout_manager, GtkWidget *
 
 	if (orientation == GTK_ORIENTATION_HORIZONTAL) {
 		*natural = (*env)->CallIntMethod(env, layout->view, handle_cache.view.getMeasuredWidth);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		*minimum = heightMeasureSpec && !widthMeasureSpec ? *natural
 		                                                  : (*env)->CallIntMethod(env, layout->view, handle_cache.view.getSuggestedMinimumWidth);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	} else if (orientation == GTK_ORIENTATION_VERTICAL) {
 		*natural = (*env)->CallIntMethod(env, layout->view, handle_cache.view.getMeasuredHeight);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		*minimum = widthMeasureSpec && !heightMeasureSpec ? *natural
 		                                                  : (*env)->CallIntMethod(env, layout->view, handle_cache.view.getSuggestedMinimumHeight);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 	if (*natural < *minimum)
 		*natural = *minimum;
@@ -80,8 +96,10 @@ static void android_layout_allocate(GtkLayoutManager *layout_manager, GtkWidget 
 	}
 
 	(*env)->CallVoidMethod(env, layout->view, handle_cache.view.layoutInternal, width, height);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static GtkSizeRequestMode android_layout_get_request_mode(GtkLayoutManager *layout_manager, GtkWidget *widget)
