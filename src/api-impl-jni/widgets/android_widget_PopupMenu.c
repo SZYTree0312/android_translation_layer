@@ -43,8 +43,10 @@ static void popupmenu_activated(GSimpleAction *action, GVariant *parameter, gpoi
 	jobject this = (jobject)user_data;
 	jmethodID onMenuItemClick = _METHOD(_CLASS(this), "menuItemClickCallback", "(I)V");
 	(*env)->CallVoidMethod(env, this, onMenuItemClick, id);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static const GActionEntry action_entry = {"clicked", popupmenu_activated, "i", NULL, NULL};

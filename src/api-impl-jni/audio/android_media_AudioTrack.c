@@ -120,8 +120,10 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize(JNIEnv *en
 	snd_pcm_close(pcm_handle);
 
 	_SET_STATIC_INT_FIELD(this_class, "frames", frames);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	printf("\n\nJava_android_media_AudioTrack_getMinBufferSize is returning: %ld\n\n\n", frames * num_channels * 2);
 	return frames * num_channels * 2; // FIXME: 2 bytes = 16 bits (s16)
@@ -155,8 +157,10 @@ void periodic_update_callback(snd_async_handler_t *pcm_callback)
 	if (d->listener)
 		(*env)->CallVoidMethod(env, d->listener, handle_cache.audio_track_periodic_listener.onPeriodicNotification, d->this);
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (attach_ret == JNI_OK) // if we (succesfully) attached a thread, we should probably detach it now
 		(*d->jvm)->DetachCurrentThread(d->jvm);

@@ -27,8 +27,10 @@ static void java_paintable_snapshot(GdkPaintable *gdk_paintable, GdkSnapshot *sn
 	jobject canvas = (*env)->NewObject(env, canvas_class, canvas_constructor, _INTPTR(snapshot));
 	(*env)->CallVoidMethod(env, paintable->drawable, handle_cache.drawable.setBounds, 0, 0, (int)width, (int)height);
 	(*env)->CallVoidMethod(env, paintable->drawable, handle_cache.drawable.draw, canvas);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, canvas);
 	(*env)->DeleteLocalRef(env, canvas_class);
 }

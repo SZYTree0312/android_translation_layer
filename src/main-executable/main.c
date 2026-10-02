@@ -273,6 +273,7 @@ static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, do
 	jobject activity = (*env)->CallStaticObjectMethod(env, handle_cache.context.class, handle_cache.context.resolveActivityInternal, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 	if (!activity) {
 		fprintf(stderr, "failed to resolve activity to handle URI: %s\n", data);
@@ -352,8 +353,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		jobject activity = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
 		                                                  _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
 		                                                  _JSTRING(d->apk_main_activity_class), _INTPTR(window), _JSTRING(uri));
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		activity_start(env, activity);
 		return;
 	}
@@ -515,20 +518,28 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	// construct Application
 	application_object = (*env)->CallStaticObjectMethod(env, handle_cache.context.class,
 	                                                    _STATIC_METHOD(handle_cache.context.class, "createApplication", "(J)Landroid/app/Application;"), window);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	jclass content_provider = (*env)->FindClass(env, "android/content/ContentProvider");
 	(*env)->CallStaticVoidMethod(env, content_provider, _STATIC_METHOD(content_provider, "createContentProviders", "()V"));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	jmethodID on_create_method = _METHOD(handle_cache.application.class, "onCreate", "()V");
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->CallVoidMethod(env, application_object, on_create_method);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (d->apk_instrumentation_class) {
 		if (d->apk_main_activity_class) {
@@ -547,8 +558,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		                               _STATIC_METHOD(handle_cache.instrumentation.class, "create", "(Ljava/lang/String;Landroid/content/Intent;)Landroid/app/Instrumentation;"),
 		                               _JSTRING(d->apk_instrumentation_class), intent);
 
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	// construct main Activity
@@ -556,8 +569,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		activity_object = (*env)->CallStaticObjectMethod(env, handle_cache.activity.class,
 		                                                 _STATIC_METHOD(handle_cache.activity.class, "createMainActivity", "(Ljava/lang/String;JLjava/lang/String;)Landroid/app/Activity;"),
 		                                                 _JSTRING(d->apk_main_activity_class), _INTPTR(window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		if (uri_option)
 			g_free(uri_option);
 
@@ -572,14 +587,18 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	if (!d->apk_instrumentation_class) {
 		jstring package_name_jstr = (*env)->CallObjectMethod(env, application_object, handle_cache.context.get_package_name);
 		package_name = package_name_jstr ? _CSTRING(package_name_jstr) : NULL;
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	jstring app_icon_path_jstr = (*env)->CallObjectMethod(env, application_object, handle_cache.application.get_app_icon_path);
 	const char *app_icon_path = app_icon_path_jstr ? _CSTRING(app_icon_path_jstr) : NULL;
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (d->install || d->install_internal) {
 		if (d->apk_instrumentation_class) {
@@ -590,8 +609,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		XdpPortal *portal = xdp_portal_new();
 
 		const char *app_label = _CSTRING((*env)->CallObjectMethod(env, application_object, _METHOD(handle_cache.application.class, "get_app_label", "()Ljava/lang/String;")));
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 
 		GVariant *icon_serialized = NULL;
 		if (!d->install_internal) {
@@ -646,8 +667,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		jmethodID get_supported_mime_types = _METHOD(handle_cache.application.class, "get_supported_mime_types", "()Ljava/lang/String;");
 		jstring supported_mime_types_jstr = (*env)->CallObjectMethod(env, application_object, get_supported_mime_types);
 		const char *supported_mime_types = supported_mime_types_jstr ? _CSTRING(supported_mime_types_jstr) : NULL;
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 
 		GString *exec_cmd = g_string_new("env ");
 		if (getenv("RUN_FROM_BUILDDIR")) {
@@ -742,8 +765,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		jobject input_queue = g_object_get_data(G_OBJECT(window), "input_queue");
 
 		(*env)->CallVoidMethod(env, input_queue_callback, handle_cache.input_queue_callback.onInputQueueCreated, input_queue);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	if (strcmp(app_id, "com.example.demo_application")) {

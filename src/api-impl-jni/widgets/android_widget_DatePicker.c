@@ -25,8 +25,10 @@ static void day_selected_cb(GtkWidget *calendar, gpointer user_data)
 
 	(*env)->CallVoidMethod(env, wrapper->jobj, handle_cache.date_picker.onDateChange);
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_widget_DatePicker_nativeSetOnDateChangedListener(JNIEnv *env, jobject this, jlong widget_ptr)

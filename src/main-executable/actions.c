@@ -13,6 +13,7 @@ static void action_start_activity(GSimpleAction *action, GVariant *parameter, gp
 	(*env)->CallVoidMethod(env, context, handle_cache.context.startActivity, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 }
 
@@ -25,6 +26,7 @@ static void action_start_service(GSimpleAction *action, GVariant *parameter, gpo
 	(*env)->CallObjectMethod(env, context, handle_cache.context.startService, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 }
 
@@ -37,6 +39,7 @@ static void action_send_broadcast(GSimpleAction *action, GVariant *parameter, gp
 	(*env)->CallVoidMethod(env, context, handle_cache.context.sendBroadcast, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 }
 

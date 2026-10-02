@@ -234,6 +234,7 @@ static gboolean on_new_endpoint(Connector1 *connector, GDBusMethodInvocation *in
 	(*env)->CallVoidMethod(env, context, handle_cache.context.sendBroadcast, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 	return TRUE;
 }
@@ -259,6 +260,7 @@ static gboolean on_message(Connector1 *connector, GDBusMethodInvocation *invocat
 	(*env)->CallVoidMethod(env, context, handle_cache.context.sendBroadcast, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 	return TRUE;
 }

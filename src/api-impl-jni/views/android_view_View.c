@@ -87,8 +87,10 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 		ret = (*env)->CallBooleanMethod(env, this, handle_cache.view.onTouchEventInternal, motion_event, (jboolean)is_synthetic);
 	}
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (action == ACTION_UP || action == ACTION_CANCEL)
 		wrapper->intercepting_touch = false;
@@ -128,8 +130,10 @@ static void call_hover_callback(jobject this, int action, float x, float y, floa
 	JNIEnv *env = get_jni_env();
 	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor_single, SOURCE_CLASS_POINTER, action, 0, x, y, x, y);
 	(*env)->CallBooleanMethod(env, this, handle_cache.view.dispatchHoverEvent, motion_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void transform_coords_to_widget_relative(GtkWidget *widget, double *x, double *y)
@@ -280,8 +284,10 @@ static void on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 
 	jboolean handled = (*env)->CallBooleanMethod(env, wrapper->jobj, handle_cache.view.performClick);
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (handled) {
 		gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
@@ -339,8 +345,10 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	                                         gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
 
 	gboolean ret = (*env)->CallBooleanMethod(env, this, handle_cache.view.dispatchGenericMotionEvent, motion_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	// HACK: replay last hover event to work around scrolling issues in composeUI apps
 	if (wrapper->hover_x && wrapper->hover_y)
@@ -819,8 +827,10 @@ static void on_long_click(GtkGestureLongPress *gesture, double x, double y, gpoi
 
 	bool ret = (*env)->CallBooleanMethod(env, wrapper->jobj, handle_cache.view.performLongClick, x, y);
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (ret)
 		gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);

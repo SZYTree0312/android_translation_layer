@@ -18,19 +18,25 @@ static void commit_cb(GtkIMContext *context, gchar *str, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
 	(*env)->CallBooleanMethod(env, connection, commitText, _JSTRING(str), 1);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void retrieve_surrounding_cb(GtkIMContext *context, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
 	jobject before = (*env)->CallObjectMethod(env, connection, getTextBeforeCursor, 100, 0);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	jobject after = (*env)->CallObjectMethod(env, connection, getTextAfterCursor, 100, 0);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	jstring before_str = before ? (*env)->CallObjectMethod(env, before, toString) : NULL;
 	jstring after_str = after ? (*env)->CallObjectMethod(env, after, toString) : NULL;
 	const char *before_cstr = before_str ? (*env)->GetStringUTFChars(env, before_str, NULL) : "";
@@ -49,8 +55,10 @@ static void delete_surrounding_cb(GtkIMContext *context, gint offset, gint n_cha
 {
 	JNIEnv *env = get_jni_env();
 	(*env)->CallBooleanMethod(env, connection, deleteSurroundingText, -offset, offset + n_chars);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_inputmethod_InputMethodManager_nativeInit(JNIEnv *env, jclass class)

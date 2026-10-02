@@ -35,8 +35,10 @@ static void activate_cb(GtkListView *list, guint position, gpointer user_data)
 	jobject on_click = g_object_get_data(G_OBJECT(list), "on_click");
 	jmethodID on_click_method = _METHOD(_CLASS(on_click), "onClick", "(Landroid/content/DialogInterface;I)V");
 	(*env)->CallVoidMethod(env, on_click, on_click_method, this, position);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeConstruct(JNIEnv *env, jobject this, jlong ptr, jlong button_positive_ptr, jlong button_negative_ptr, jlong button_neutral_ptr)
