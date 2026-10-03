@@ -16,6 +16,7 @@
 
 package android.database;
 
+import android.annotation.UnsupportedAppUsage;
 import android.content.ContentResolver;
 import android.net.Uri;
 import android.os.Build;
@@ -125,6 +126,12 @@ public abstract class AbstractCursor implements CrossProcessCursor {
 	public void deactivate() {
 		onDeactivateOrClose();
 	}
+
+	@UnsupportedAppUsage // Not public API, but used directly in CTS tests over reflection
+	public void deactivateInternal() {
+		deactivate();
+	}
+
 	/** @hide */
 	protected void onDeactivateOrClose() {
 		if (mSelfObserver != null) {
@@ -427,15 +434,24 @@ public abstract class AbstractCursor implements CrossProcessCursor {
 	 */
 	@Deprecated
 	protected boolean isFieldUpdated(int columnIndex) {
-		return false;
+		if (mUpdatedRows == null || mCurrentRowID == null)
+			return false;
+		Map<String, Object> rowUpdates = mUpdatedRows.get(mCurrentRowID);
+		if (rowUpdates == null)
+			return false;
+		return rowUpdates.containsKey(Integer.toString(columnIndex));
 	}
 	/**
 	 * @deprecated Always returns null since Cursors do not support updating rows
 	 */
 	@Deprecated
 	protected Object getUpdatedField(int columnIndex) {
-		return null;
+		return mUpdatedRows.get(mCurrentRowID).get(Integer.toString(columnIndex));
 	}
+	protected void notifyDataSetObservers() {
+		mDataSetObservable.notifyChanged();
+	}
+
 	/**
 	 * This function throws CursorIndexOutOfBoundsException if
 	 * the cursor position is out of bounds. Subclass implementations of
@@ -446,8 +462,7 @@ public abstract class AbstractCursor implements CrossProcessCursor {
 	 */
 	protected void checkPosition() {
 		if (-1 == mPos || getCount() == mPos) {
-			// throw new CursorIndexOutOfBoundsException(mPos, getCount());
-			throw new IndexOutOfBoundsException("index = " + mPos + " count = " + getCount());
+			throw new CursorIndexOutOfBoundsException(mPos, getCount());
 		}
 	}
 	@Override
@@ -463,6 +478,41 @@ public abstract class AbstractCursor implements CrossProcessCursor {
 		} catch (Exception e) {
 		}
 	}
+	@Override
+	public boolean updateString(int columnIndex, String value) {
+		return false;
+	}
+
+	@Override
+	public boolean updateInt(int columnIndex, int value) {
+		return false;
+	}
+
+	@Override
+	public boolean updateBlob(int columnIndex, byte[] value) {
+		return false;
+	}
+
+	@Override
+	public boolean commitUpdates() {
+		return false;
+	}
+
+	@Override
+	public boolean deleteRow() {
+		return false;
+	}
+
+	@Override
+	public boolean hasUpdates() {
+		return false;
+	}
+
+	@Override
+	public boolean supportsUpdates() {
+		return false;
+	}
+
 	/**
 	 * Cursors use this class to track changes others make to their URI.
 	 */

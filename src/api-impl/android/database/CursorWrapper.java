@@ -214,6 +214,41 @@ public class CursorWrapper implements Cursor {
 		return cursor.respond(extras);
 	}
 
+	@Override
+	public boolean updateString(int columnIndex, String value) {
+		return cursor.updateString(columnIndex, value);
+	}
+
+	@Override
+	public boolean updateInt(int columnIndex, int value) {
+		return cursor.updateInt(columnIndex, value);
+	}
+
+	@Override
+	public boolean updateBlob(int columnIndex, byte[] value) {
+		return cursor.updateBlob(columnIndex, value);
+	}
+
+	@Override
+	public boolean commitUpdates() {
+		return cursor.commitUpdates();
+	}
+
+	@Override
+	public boolean deleteRow() {
+		return cursor.deleteRow();
+	}
+
+	@Override
+	public boolean hasUpdates() {
+		return cursor.hasUpdates();
+	}
+
+	@Override
+	public boolean supportsUpdates() {
+		return cursor.supportsUpdates();
+	}
+
 	public Cursor getWrappedCursor() {
 		return cursor;
 	}

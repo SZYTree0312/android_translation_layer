@@ -475,4 +475,18 @@ public interface Cursor extends Closeable {
 	 *         Never <code>null</code>.
 	 */
 	Bundle respond(Bundle extras);
+
+	boolean updateString(int columnIndex, String value);
+
+	boolean updateInt(int columnIndex, int value);
+
+	boolean updateBlob(int columnIndex, byte[] value);
+
+	boolean commitUpdates();
+
+	boolean deleteRow();
+
+	boolean hasUpdates();
+
+	boolean supportsUpdates();
 }

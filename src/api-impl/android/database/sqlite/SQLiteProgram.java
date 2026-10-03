@@ -20,7 +20,9 @@
 
 package android.database.sqlite;
 
+import android.atl.ATLLoadedApp;
 import android.database.DatabaseUtils;
+import android.os.Build;
 import android.os.CancellationSignal;
 import java.util.Arrays;
 
@@ -114,13 +116,14 @@ public abstract class SQLiteProgram extends SQLiteClosable {
 		mDatabase.onCorruption();
 	}
 
+	private static int sNextUniqueId = 1;
+
 	/**
-	 * Unimplemented.
 	 * @deprecated This method is deprecated and must not be used.
 	 */
 	@Deprecated
 	public final int getUniqueId() {
-		return -1;
+		return sNextUniqueId++;
 	}
 
 	/**
@@ -212,9 +215,15 @@ public abstract class SQLiteProgram extends SQLiteClosable {
 
 	private void bind(int index, Object value) {
 		if (index < 1 || index > mNumParameters) {
-			throw new IllegalArgumentException("Cannot bind argument at index "
-			                                   + index + " because the index is out of range.  "
-			                                   + "The statement has " + mNumParameters + " parameters.");
+			if (ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.JELLY_BEAN) {
+				throw new IllegalArgumentException("Cannot bind argument at index "
+				                                   + index + " because the index is out of range.  "
+				                                   + "The statement has " + mNumParameters + " parameters.");
+			} else {
+				throw new SQLiteException("Cannot bind argument at index "
+				                          + index + " because the index is out of range.  "
+				                          + "The statement has " + mNumParameters + " parameters.");
+			}
 		}
 		mBindArgs[index - 1] = value;
 	}

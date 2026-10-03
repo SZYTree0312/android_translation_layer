@@ -212,7 +212,7 @@ public class MatrixCursor extends AbstractCursor {
 		 */
 		public RowBuilder add(Object columnValue) {
 			if (index == endIndex) {
-				throw new IndexOutOfBoundsException(
+				throw new CursorIndexOutOfBoundsException(
 				    "No more columns left.");
 			}
 

@@ -20,10 +20,16 @@
 
 package android.database.sqlite;
 
+import android.atl.ATLLoadedApp;
+import android.content.ContentValues;
 import android.database.AbstractWindowedCursor;
 import android.database.CursorWindow;
 import android.database.DatabaseUtils;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -91,7 +97,10 @@ public class SQLiteCursor extends AbstractWindowedCursor {
 	 */
 	public SQLiteCursor(SQLiteCursorDriver driver, String editTable, SQLiteQuery query) {
 		if (query == null) {
-			throw new IllegalArgumentException("query object cannot be null");
+			if (ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+				throw new IllegalArgumentException("query object cannot be null");
+			else
+				throw new NullPointerException("query object cannot be null");
 		}
 		mDriver = driver;
 		mEditTable = editTable;
@@ -171,6 +180,19 @@ public class SQLiteCursor extends AbstractWindowedCursor {
 			awc_closeWindow();
 			throw ex;
 		}
+		// fillWindow was async pre Android 4.0, so we need to notify observers to not hang the old CTS tests
+		if (ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.targetSdkVersion < Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
+			final Looper looper = Looper.myLooper();
+			if (looper != null) {
+				new Handler(looper).post(new Runnable() {
+					@Override
+					public void run() {
+						if (!isClosed())
+							notifyDataSetObservers();
+					}
+				});
+			}
+		}
 	}
 
 	@Override
@@ -239,6 +261,12 @@ public class SQLiteCursor extends AbstractWindowedCursor {
 			mPos = -1;
 			mCount = NO_COUNT;
 
+			// Pending updates are keyed by row id.  The data set is about
+			// to change, so those ids may no longer refer to the same rows.
+			// Drop them to avoid applying updates to the wrong rows later.
+			if (mUpdatedRows != null)
+				mUpdatedRows.clear();
+
 			mDriver.cursorRequeried(this);
 		}
 
@@ -255,6 +283,118 @@ public class SQLiteCursor extends AbstractWindowedCursor {
 	public void setWindow(CursorWindow window) {
 		super.setWindow(window);
 		mCount = NO_COUNT;
+	}
+
+	// --- Row update / delete support ---
+	private boolean mRowIdColumnInitialized = false;
+
+	// Tracks updates per row id, using the inherited mUpdatedRows field.
+	// Each entry maps column index (as a string) -> value.
+	private Map<String, Object> getOrCreateRowUpdates(long rowId) {
+		if (mUpdatedRows == null)
+			mUpdatedRows = new HashMap<Long, Map<String, Object>>();
+		Map<String, Object> updates = mUpdatedRows.get(rowId);
+		if (updates == null) {
+			updates = new HashMap<String, Object>();
+			mUpdatedRows.put(rowId, updates);
+		}
+		return updates;
+	}
+
+	private long getRowIdAtPosition(int position) {
+		if (!mRowIdColumnInitialized) {
+			// Find the _id column index from the column names.
+			String[] cols = mColumns;
+			mRowIdColumnIndex = -1;
+			for (int i = 0; i < cols.length; i++) {
+				if ("_id".equals(cols[i])) {
+					mRowIdColumnIndex = i;
+					break;
+				}
+			}
+			mRowIdColumnInitialized = true;
+		}
+		if (mRowIdColumnIndex < 0)
+			throw new IllegalStateException(
+			    "Cannot determine the row id because the cursor has no _id column.");
+		return mWindow.getLong(position, mRowIdColumnIndex);
+	}
+
+	@Override
+	public boolean updateString(int columnIndex, String value) {
+		checkPosition();
+		if (mWindow.putString(value, mPos, columnIndex)) {
+			getOrCreateRowUpdates(getRowIdAtPosition(mPos)).put(Integer.toString(columnIndex), value);
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public boolean updateInt(int columnIndex, int value) {
+		checkPosition();
+		if (mWindow.putLong((long)value, mPos, columnIndex)) {
+			getOrCreateRowUpdates(getRowIdAtPosition(mPos)).put(Integer.toString(columnIndex), (Long)(long)value);
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public boolean updateBlob(int columnIndex, byte[] value) {
+		checkPosition();
+		if (mWindow.putBlob(value, mPos, columnIndex)) {
+			getOrCreateRowUpdates(getRowIdAtPosition(mPos)).put(Integer.toString(columnIndex), value);
+			return true;
+		}
+		return false;
+	}
+
+	public boolean commitUpdates() {
+		if (mUpdatedRows != null && !mUpdatedRows.isEmpty()) {
+			for (Map.Entry<Long, Map<String, Object>> rowEntry : mUpdatedRows.entrySet()) {
+				long rowId = rowEntry.getKey();
+				Map<String, Object> updates = rowEntry.getValue();
+				ContentValues values = new ContentValues();
+				for (Map.Entry<String, Object> colEntry : updates.entrySet()) {
+					int colIndex = Integer.parseInt(colEntry.getKey());
+					Object val = colEntry.getValue();
+					if (val instanceof Long)
+						values.put(mColumns[colIndex], (Long)val);
+					else if (val instanceof String)
+						values.put(mColumns[colIndex], (String)val);
+					else if (val instanceof byte[])
+						values.put(mColumns[colIndex], (byte[])val);
+				}
+				getDatabase().update(mEditTable, values, "_id=" + rowId, null);
+				// Legacy sync support: flag (or propagate the flag to) the
+				// _sync_dirty column of the affected row.
+				getDatabase().rowUpdated(mEditTable, rowId);
+			}
+			mUpdatedRows.clear();
+		}
+		return true;
+	}
+
+	public boolean deleteRow() {
+		checkPosition();
+		long rowId = getRowIdAtPosition(mPos);
+		int numDeleted = getDatabase().delete(mEditTable, "_id=" + rowId, null);
+		if (numDeleted > 0) {
+			boolean success = requery();
+			if (mUpdatedRows != null)
+				mUpdatedRows.clear();
+			return success;
+		}
+		return false;
+	}
+
+	public boolean hasUpdates() {
+		return mUpdatedRows != null && !mUpdatedRows.isEmpty();
+	}
+
+	public boolean supportsUpdates() {
+		return true;
 	}
 
 	/**

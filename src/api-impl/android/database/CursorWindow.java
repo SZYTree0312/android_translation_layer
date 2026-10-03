@@ -22,6 +22,10 @@ package android.database;
 import android.content.res.Resources;
 import android.database.sqlite.SQLiteClosable;
 import android.database.sqlite.SQLiteException;
+import android.os.Binder;
+import android.os.IBinder;
+import android.os.Parcel;
+import android.os.ParcelFormatException;
 import android.os.Parcelable;
 import java.util.ArrayList;
 import java.util.List;
@@ -605,6 +609,37 @@ public class CursorWindow extends SQLiteClosable implements Parcelable {
 	public int describeContents() {
 		return 0;
 	}
+
+	private static final Binder sDummyBinder = new Binder();
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeStrongBinder(sDummyBinder);
+		dest.writeInt(startPos);
+	}
+
+	public static CursorWindow newFromParcel(Parcel parcel) {
+		CursorWindow cursorWindow = new CursorWindow(null);
+		try {
+			parcel.readStrongBinder();
+			cursorWindow.startPos = parcel.readInt();
+		} catch (ParcelFormatException e) {
+			throw new IllegalStateException(e);
+		}
+		return cursorWindow;
+	}
+
+	public static final Parcelable.Creator<CursorWindow> CREATOR = new Parcelable.Creator<CursorWindow>() {
+		@Override
+		public CursorWindow createFromParcel(Parcel in) {
+			return newFromParcel(in);
+		}
+
+		@Override
+		public CursorWindow[] newArray(int size) {
+			return new CursorWindow[size];
+		}
+	};
 
 	@Override
 	protected void onAllReferencesReleased() {

@@ -128,6 +128,11 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	// INVARIANT: Guarded by mLock.
 	private boolean mHasAttachedDbsLocked;
 
+	// Maps table names to the info about which row's _sync_dirty flag to set on
+	// an update (legacy sync API).  Guarded by mLock.
+	private final HashMap<String, SyncUpdateInfo> mSyncUpdateInfo =
+	    new HashMap<String, SyncUpdateInfo>();
+
 	/**
 	 * When a constraint violation occurs, an immediate ROLLBACK occurs,
 	 * thus ending the current transaction, and the command aborts with a
@@ -641,12 +646,19 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	}
 
 	/**
-	 * Deprecated.
 	 * @deprecated This method no longer serves any useful purpose and has been deprecated.
 	 */
 	@Deprecated
 	public Map<String, String> getSyncedTables() {
-		return new HashMap<String, String>(0);
+		synchronized (mLock) {
+			HashMap<String, String> tables = new HashMap<String, String>();
+			for (Map.Entry<String, SyncUpdateInfo> entry : mSyncUpdateInfo.entrySet()) {
+				SyncUpdateInfo info = entry.getValue();
+				if (info.deletedTable != null)
+					tables.put(entry.getKey(), info.deletedTable);
+			}
+			return tables;
+		}
 	}
 
 	/**
@@ -931,6 +943,7 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	 */
 	@Deprecated
 	public void markTableSyncable(String table, String deletedTable) {
+		markTableSyncable(table, "_id", table, deletedTable);
 	}
 
 	/**
@@ -947,6 +960,67 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	 */
 	@Deprecated
 	public void markTableSyncable(String table, String foreignKey, String updateTable) {
+		markTableSyncable(table, foreignKey, updateTable, null);
+	}
+
+	private void markTableSyncable(String table, String foreignKey, String updateTable,
+	                               String deletedTable) {
+		synchronized (mLock) {
+			// Make sure the columns being referenced actually exist; throws a
+			// SQLiteException otherwise, like the original implementation did.
+			rawQuery("SELECT _sync_dirty FROM " + updateTable + " LIMIT 0", null).close();
+			rawQuery("SELECT " + foreignKey + " FROM " + table + " LIMIT 0", null).close();
+			mSyncUpdateInfo.put(table, new SyncUpdateInfo(updateTable, deletedTable, foreignKey));
+		}
+	}
+
+	/**
+	 * Call for each row that is updated in a cursor.  Sets the _sync_dirty flag
+	 * on the row referenced by the updated table's foreign key, for the legacy
+	 * sync API.
+	 *
+	 * @param table the table the row is in
+	 * @param rowId the row ID of the updated row
+	 */
+	/* package */ void rowUpdated(String table, long rowId) {
+		SyncUpdateInfo info;
+		synchronized (mLock) {
+			info = mSyncUpdateInfo.get(table);
+		}
+		if (info != null)
+			execSQL("UPDATE " + info.updateTable + " SET _sync_dirty=1 WHERE _id=(SELECT "
+			        + info.foreignKey + " FROM " + table + " WHERE _id=" + rowId + ")");
+	}
+
+	/**
+	 * Internal class used to keep track what needs to be marked as changed
+	 * when an update occurs. This is used for syncing, so the sync engine
+	 * knows what data has been updated locally.
+	 */
+	private static final class SyncUpdateInfo {
+		/**
+		 * Creates the SyncUpdateInfo class.
+		 *
+		 * @param updateTable The table to set _sync_dirty to 1 in
+		 * @param deletedTable The deleted table that corresponds to the
+		 *          master table, or null if there is none
+		 * @param foreignKey The column in the syncable table that refers to the
+		 *          _id in updateTable
+		 */
+		SyncUpdateInfo(String updateTable, String deletedTable, String foreignKey) {
+			this.updateTable = updateTable;
+			this.deletedTable = deletedTable;
+			this.foreignKey = foreignKey;
+		}
+
+		/** The table containing the _sync_dirty column */
+		String updateTable;
+
+		/** The deleted table that corresponds to the updateTable, or null */
+		String deletedTable;
+
+		/** The column in the syncable table whose value is an _id in updateTable */
+		String foreignKey;
 	}
 
 	/**
@@ -1269,6 +1343,22 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	public Cursor rawQuery(String sql, String[] selectionArgs,
 	                       CancellationSignal cancellationSignal) {
 		return rawQueryWithFactory(null, sql, selectionArgs, null, cancellationSignal);
+	}
+
+	/**
+	 * Runs the provided SQL and returns a cursor over the result set.
+	 *
+	 * @param sql the SQL query. The SQL string must not be ; terminated
+	 * @param selectionArgs You may include ?s in where clause in the query,
+	 *     which will be replaced by the values from selectionArgs. The
+	 *     values will be bound as Strings.
+	 * @param offset the offset on the result set
+	 * @param limit the limit on the result set
+	 * @return A {@link Cursor} object, which is positioned before the first entry. Note that
+	 * {@link Cursor}s are not synchronized, see the documentation for more details.
+	 */
+	public Cursor rawQuery(String sql, String[] selectionArgs, int offset, int limit) {
+		return rawQueryWithFactory(null, sql, selectionArgs, null, null);
 	}
 
 	/**

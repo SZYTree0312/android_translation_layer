@@ -20,11 +20,14 @@
 
 package android.database.sqlite;
 
+import android.atl.ATLLoadedApp;
 import android.database.Cursor;
 import android.database.CursorWindow;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDebug.DbStats;
+import android.os.Build;
 import android.os.CancellationSignal;
+import android.os.OperationCanceledException;
 import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
 import android.util.Log;
@@ -117,7 +120,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 	private int mCancellationSignalAttachCount;
 
 	private static native long nativeOpen(String path, int openFlags, String label,
-	                                      boolean enableTrace, boolean enableProfile);
+	                                      boolean enableTrace, boolean enableProfile,
+	                                      boolean allowMovedDbWrites);
 	private static native void nativeClose(long connectionPtr);
 	private static native void nativeRegisterCustomFunction(long connectionPtr,
 	                                                        SQLiteCustomFunction function);
@@ -141,7 +145,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 	                                          int index, byte[] value);
 	private static native void nativeResetStatementAndClearBindings(
 	    long connectionPtr, long statementPtr);
-	private static native void nativeExecute(long connectionPtr, long statementPtr);
+	private static native void nativeExecute(long connectionPtr, long statementPtr, boolean isPragmaStatement);
 	private static native long nativeExecuteForLong(long connectionPtr, long statementPtr);
 	private static native String nativeExecuteForString(long connectionPtr, long statementPtr);
 	private static native int nativeExecuteForBlobFileDescriptor(
@@ -208,9 +212,14 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 	}
 
 	private void open() {
+		// Restore the old stale-write behaviour only for apps that target API < 21.
+		final boolean allowMovedDbWrites =
+		    ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.targetSdkVersion
+		    < Build.VERSION_CODES.LOLLIPOP;
 		mConnectionPtr = nativeOpen(mConfiguration.path, mConfiguration.openFlags,
 		                            mConfiguration.label,
-		                            SQLiteDebug.DEBUG_SQL_STATEMENTS, SQLiteDebug.DEBUG_SQL_TIME);
+		                            SQLiteDebug.DEBUG_SQL_STATEMENTS, SQLiteDebug.DEBUG_SQL_TIME,
+		                            allowMovedDbWrites);
 
 		setPageSize();
 		setForeignKeyModeFromConfiguration();
@@ -565,7 +574,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 				applyBlockGuardPolicy(statement);
 				attachCancellationSignal(cancellationSignal);
 				try {
-					nativeExecute(mConnectionPtr, statement.mStatementPtr);
+					nativeExecute(mConnectionPtr, statement.mStatementPtr, statement.mType == DatabaseUtils.STATEMENT_PRAGMA);
 				} finally {
 					detachCancellationSignal(cancellationSignal);
 				}

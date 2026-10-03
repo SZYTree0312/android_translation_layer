@@ -17,6 +17,12 @@ import java.util.Collections;
 import java.util.List;
 
 public class ContentResolver {
+	public ContentResolver() {
+	}
+
+	public ContentResolver(Context context) {
+	}
+
 	public static final String SCHEME_CONTENT = "content";
 
 	public static final String SYNC_EXTRAS_IGNORE_SETTINGS = "ignore_settings";

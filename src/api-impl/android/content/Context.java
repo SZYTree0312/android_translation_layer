@@ -521,7 +521,7 @@ public abstract class Context {
 		if ((mode & MODE_NO_LOCALIZED_COLLATORS) != 0) {
 			flags |= SQLiteDatabase.NO_LOCALIZED_COLLATORS;
 		}
-		SQLiteDatabase db = SQLiteDatabase.openDatabase(filename, factory, flags, errorHandler);
+		SQLiteDatabase db = SQLiteDatabase.openDatabase(getDatabasePath(filename).getPath(), factory, flags, errorHandler);
 		return db;
 	}
 

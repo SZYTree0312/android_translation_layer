@@ -108,8 +108,37 @@ static void sqliteProfileCallback(void *data, const char *sql, sqlite3_uint64 tm
 	// 		connection->label, sql, tm * 0.000001f);
 }
 
+// Pre-Lollipop SQLite tolerated writes to a database file that was deleted and
+// re-created behind an open connection (writing to the stale file, discarding
+// the results on close); modern SQLite refuses with SQLITE_READONLY_DBMOVED.
+// Neutralise the SQLITE_FCNTL_HAS_MOVED file control to restore the old
+// behaviour for apps that target an API level below 21.
+static const sqlite3_io_methods *real_io_methods = NULL;
+static sqlite3_io_methods legacy_io_methods;
+
+static int legacy_xFileControl(sqlite3_file *pFile, int op, void *pArg)
+{
+	if (op == SQLITE_FCNTL_HAS_MOVED)
+		return SQLITE_OK;
+	return real_io_methods->xFileControl(pFile, op, pArg);
+}
+
+// Rebind the main database file's io_methods to the wrapper above.
+static void disable_moved_check(sqlite3 *db)
+{
+	sqlite3_file *pFile = NULL;
+	if (sqlite3_file_control(db, "main", SQLITE_FCNTL_FILE_POINTER, &pFile) != SQLITE_OK)
+		return;
+	if (real_io_methods == NULL) {
+		real_io_methods = pFile->pMethods;
+		memcpy(&legacy_io_methods, real_io_methods, sizeof(legacy_io_methods));
+		legacy_io_methods.xFileControl = legacy_xFileControl;
+	}
+	pFile->pMethods = &legacy_io_methods;
+}
+
 JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeOpen(JNIEnv *env, jclass clazz, jstring pathStr, jint openFlags,
-                                                                                 jstring labelStr, jboolean enableTrace, jboolean enableProfile)
+                                                                                 jstring labelStr, jboolean enableTrace, jboolean enableProfile, jboolean allowMovedDbWrites)
 {
 	int sqliteFlags;
 	if (openFlags & CREATE_IF_NECESSARY) {
@@ -164,12 +193,26 @@ JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeOpen
 		return 0;
 	}
 
+	// SQLite 3.45.0 changed the default SQLITE_MAX_PAGE_COUNT from 2^30 to 2^32-2
+	// which is also the absolute ceiling of possible values.
+	// AOSP bundles older SQLite versions. Therefore set it back to 2^30, so the CTS
+	// tests can increase the maximum size.
+	err = sqlite3_exec(db, "PRAGMA max_page_count = 1073741824", NULL, NULL, NULL);
+	if (err != SQLITE_OK) {
+		throw_sqlite3_exception_handle_message(env, db, "Could not set max page count");
+		sqlite3_close(db);
+		return 0;
+	}
+
 	// Create wrapper object.
 	struct SQLiteConnection *connection = malloc(sizeof(struct SQLiteConnection));
 	connection->db = db;
 	connection->openFlags = openFlags;
 	connection->path = path;
 	connection->label = label;
+
+	if (allowMovedDbWrites)
+		disable_moved_check(db);
 
 	// Enable tracing and profiling if requested.
 	if (enableTrace) {
@@ -441,23 +484,29 @@ JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeReset
 	}
 }
 
-static int executeNonQuery(JNIEnv *env, struct SQLiteConnection *connection, sqlite3_stmt *statement)
+static int executeNonQuery(JNIEnv *env, struct SQLiteConnection *connection, sqlite3_stmt *statement, jboolean is_pragma_statement)
 {
-	int err;
-	while (SQLITE_ROW == (err = sqlite3_step(statement)))
-		;
+	int err = sqlite3_step(statement);
+	if (is_pragma_statement) {
+		while (err == SQLITE_ROW)
+			err = sqlite3_step(statement);
+	}
+	if (err == SQLITE_ROW) {
+		throw_sqlite3_exception_handle_message(env, connection->db, "Queries cannot be performed using execute()");
+		return err;
+	}
 	if (err != SQLITE_DONE) {
 		throw_sqlite3_exception_handle(env, connection->db);
 	}
 	return err;
 }
 
-JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeExecute(JNIEnv *env, jclass clazz, jlong connectionPtr, jlong statementPtr)
+JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeExecute(JNIEnv *env, jclass clazz, jlong connectionPtr, jlong statementPtr, jboolean is_pragma_statement)
 {
 	struct SQLiteConnection *connection = _PTR(connectionPtr);
 	sqlite3_stmt *statement = _PTR(statementPtr);
 
-	executeNonQuery(env, connection, statement);
+	executeNonQuery(env, connection, statement, is_pragma_statement);
 }
 
 static int executeOneRowQuery(JNIEnv *env, struct SQLiteConnection *connection, sqlite3_stmt *statement)
@@ -502,7 +551,7 @@ JNIEXPORT jint JNICALL Java_android_database_sqlite_SQLiteConnection_nativeExecu
 	struct SQLiteConnection *connection = _PTR(connectionPtr);
 	sqlite3_stmt *statement = _PTR(statementPtr);
 
-	int err = executeNonQuery(env, connection, statement);
+	int err = executeNonQuery(env, connection, statement, false);
 	return err == SQLITE_DONE ? sqlite3_changes(connection->db) : -1;
 }
 
@@ -511,7 +560,7 @@ JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeExec
 	struct SQLiteConnection *connection = _PTR(connectionPtr);
 	sqlite3_stmt *statement = _PTR(statementPtr);
 
-	int err = executeNonQuery(env, connection, statement);
+	int err = executeNonQuery(env, connection, statement, false);
 	return err == SQLITE_DONE && sqlite3_changes(connection->db) > 0
 	         ? sqlite3_last_insert_rowid(connection->db)
 	         : -1;
