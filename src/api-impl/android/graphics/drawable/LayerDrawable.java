@@ -25,6 +25,7 @@ import android.graphics.PixelFormat;
 //import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.util.AttributeSet;
+import android.view.Gravity;
 import android.view.View;
 import java.io.IOException;
 import org.xmlpull.v1.XmlPullParser;
@@ -326,6 +327,30 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		childDrawable.mInsetT = t;
 		childDrawable.mInsetR = r;
 		childDrawable.mInsetB = b;
+	}
+
+	public void setLayerWidth(int index, int w) {
+		mLayerState.mChildren[index].mWidth = w;
+	}
+
+	public int getLayerWidth(int index) {
+		return mLayerState.mChildren[index].mWidth;
+	}
+
+	public void setLayerHeight(int index, int h) {
+		mLayerState.mChildren[index].mHeight = h;
+	}
+
+	public int getLayerHeight(int index) {
+		return mLayerState.mChildren[index].mHeight;
+	}
+
+	public void setLayerGravity(int index, int gravity) {
+		mLayerState.mChildren[index].mGravity = gravity;
+	}
+
+	public int getLayerGravity(int index) {
+		return mLayerState.mChildren[index].mGravity;
 	}
 
 	// overrides from Drawable.Callback
@@ -648,6 +673,8 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		public Drawable mDrawable;
 		public int mInsetL, mInsetT, mInsetR, mInsetB;
 		public int mId;
+		public int mWidth = -1, mHeight = -1;
+		public int mGravity = Gravity.NO_GRAVITY;
 	}
 
 	static class LayerState extends ConstantState {
