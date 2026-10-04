@@ -328,6 +328,22 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		childDrawable.mInsetB = b;
 	}
 
+	public void setLayerWidth(int index, int w) {
+		mLayerState.mChildren[index].mWidth = w;
+	}
+
+	public int getLayerWidth(int index) {
+		return mLayerState.mChildren[index].mWidth;
+	}
+
+	public void setLayerHeight(int index, int h) {
+		mLayerState.mChildren[index].mHeight = h;
+	}
+
+	public int getLayerHeight(int index) {
+		return mLayerState.mChildren[index].mHeight;
+	}
+
 	// overrides from Drawable.Callback
 
 	public void invalidateDrawable(Drawable who) {
@@ -648,6 +664,7 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		public Drawable mDrawable;
 		public int mInsetL, mInsetT, mInsetR, mInsetB;
 		public int mId;
+		public int mWidth = -1, mHeight = -1;
 	}
 
 	static class LayerState extends ConstantState {
