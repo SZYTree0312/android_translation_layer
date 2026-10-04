@@ -181,15 +181,17 @@ public class Drawable {
 			return r.obtainAttributes(set, attrs);
 	}
 
-	public void clearColorFilter() {}
+	public void clearColorFilter() { colorFilter = null; }
 
 	public final int getLevel() { return 0; }
 	public final boolean setLevel(int level) { return false; }
 
+	private ColorFilter colorFilter;
 	public void setColorFilter(int color, PorterDuff.Mode mode) {
 		setColorFilter(new PorterDuffColorFilter(color, mode));
 	}
-	public void setColorFilter(ColorFilter filter) {}
+	public void setColorFilter(ColorFilter filter) { colorFilter = filter; }
+	public ColorFilter getColorFilter() { return colorFilter; }
 
 	public ColorFilter getColorFilter() { return null; }
 
