@@ -1983,6 +1983,8 @@ public class View implements Drawable.Callback {
 		return importantForAccessibility;
 	}
 
+	public void setAccessibilityTraversalBefore(int beforeId) {}
+
 	public boolean getFitsSystemWindows() { return true; }
 
 	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {}
