@@ -243,6 +243,14 @@ extern "C" {
 #define android_webkit_WebView_FLAG_TOUCHSCREEN_BLOCKS_FOCUS 67108864L
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_addJavascriptInterface
+ * Signature: (JLjava/lang/String;[Ljava/lang/String;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1addJavascriptInterface
+  (JNIEnv *, jobject, jlong, jstring, jobjectArray);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_constructor
  * Signature: (Landroid/content/Context;Landroid/util/AttributeSet;)J
  */

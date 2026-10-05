@@ -14,6 +14,14 @@
 #include "../generated_headers/android_view_View.h"
 #include "../generated_headers/android_webkit_WebView.h"
 
+/*
+ * javascript interfaces registered with addJavascriptInterface are exposed to the page as
+ * window.<name>, where every method posts a message back to us instead of calling into java
+ * directly. this is one-way and asynchronous: unlike android, we can not return a value
+ * from the interface method.
+ */
+#define ATL_JSI_HANDLER_NAME "atlJavascriptInterface"
+
 static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
 {
 	const gchar *path = webkit_uri_scheme_request_get_path(request);
@@ -106,4 +114,171 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JN
 	const char *script_str = _CSTRING(script);
 	webkit_web_view_evaluate_javascript(webview, script_str, -1, NULL, NULL, NULL, evaluate_javascript_finished_cb, NULL);
 	(*env)->ReleaseStringUTFChars(env, script, script_str);
+}
+
+static char *js_value_to_string(JSCValue *value)
+{
+	/* strings and numbers are fine as-is, everything else is passed to java as json */
+	if (jsc_value_is_object(value))
+		return jsc_value_to_json(value, 0);
+	return jsc_value_to_string(value);
+}
+
+static jobject js_value_to_java_object(JNIEnv *env, JSCValue *value)
+{
+	if (value == NULL || jsc_value_is_null(value) || jsc_value_is_undefined(value))
+		return NULL;
+
+	if (jsc_value_is_boolean(value)) {
+		jclass boolean_class = (*env)->FindClass(env, "java/lang/Boolean");
+		jmethodID value_of = _STATIC_METHOD(boolean_class, "valueOf", "(Z)Ljava/lang/Boolean;");
+		return (*env)->CallStaticObjectMethod(env, boolean_class, value_of, jsc_value_to_boolean(value) ? JNI_TRUE : JNI_FALSE);
+	}
+
+	if (jsc_value_is_number(value)) {
+		jclass double_class = (*env)->FindClass(env, "java/lang/Double");
+		jmethodID value_of = _STATIC_METHOD(double_class, "valueOf", "(D)Ljava/lang/Double;");
+		return (*env)->CallStaticObjectMethod(env, double_class, value_of, (jdouble) jsc_value_to_double(value));
+	}
+
+	char *string = js_value_to_string(value);
+	jobject result = _JSTRING(string);
+	g_free(string);
+	return result;
+}
+
+static void script_message_received_cb(WebKitUserContentManager *manager, WebKitJavascriptResult *result, gpointer user_data)
+{
+	WrapperWidget *wrapper = WRAPPER_WIDGET(user_data);
+	JNIEnv *env = get_jni_env();
+	JSCValue *message = webkit_javascript_result_get_js_value(result);
+	if (!jsc_value_is_object(message))
+		return;
+
+	JSCValue *name_value = jsc_value_object_get_property(message, "name");
+	JSCValue *method_value = jsc_value_object_get_property(message, "method");
+	JSCValue *args_value = jsc_value_object_get_property(message, "args");
+
+	char *name = name_value != NULL ? js_value_to_string(name_value) : NULL;
+	char *method = method_value != NULL ? js_value_to_string(method_value) : NULL;
+
+	jsize arg_count = 0;
+	jobjectArray args = NULL;
+	if (args_value != NULL && jsc_value_is_array(args_value)) {
+		JSCValue *length_value = jsc_value_object_get_property(args_value, "length");
+		if (length_value != NULL && jsc_value_is_number(length_value))
+			arg_count = (jsize) jsc_value_to_double(length_value);
+		if (length_value != NULL)
+			g_object_unref(length_value);
+
+		args = (*env)->NewObjectArray(env, arg_count, (*env)->FindClass(env, "java/lang/Object"), NULL);
+		for (jsize i = 0; i < arg_count; i++) {
+			JSCValue *arg_value = jsc_value_object_get_property_at_index(args_value, i);
+			jobject arg = js_value_to_java_object(env, arg_value);
+			(*env)->SetObjectArrayElement(env, args, i, arg);
+			if (arg != NULL)
+				(*env)->DeleteLocalRef(env, arg);
+			if (arg_value != NULL)
+				g_object_unref(arg_value);
+		}
+	}
+
+	if (name != NULL && method != NULL)
+		(*env)->CallVoidMethod(env, wrapper->jobj, handle_cache.webview.internalJavascriptInterfaceCall, _JSTRING(name), _JSTRING(method), args);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionClear(env);
+
+	g_free(name);
+	g_free(method);
+	if (name_value != NULL)
+		g_object_unref(name_value);
+	if (method_value != NULL)
+		g_object_unref(method_value);
+	if (args_value != NULL)
+		g_object_unref(args_value);
+}
+
+static char *escape_js_string_literal(const char *str)
+{
+	GString *escaped = g_string_new(NULL);
+	for (const char *c = str; *c != '\0'; c++) {
+		switch (*c) {
+			case '\\':
+				g_string_append(escaped, "\\\\");
+				break;
+			case '"':
+				g_string_append(escaped, "\\\"");
+				break;
+			case '\n':
+				g_string_append(escaped, "\\n");
+				break;
+			case '\r':
+				g_string_append(escaped, "\\r");
+				break;
+			case '\t':
+				g_string_append(escaped, "\\t");
+				break;
+			default:
+				g_string_append_c(escaped, *c);
+		}
+	}
+	return g_string_free(escaped, FALSE);
+}
+
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1addJavascriptInterface(JNIEnv *env, jobject this, jlong widget_ptr, jstring name, jobjectArray method_names)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return JNI_FALSE;
+
+	WebKitWebView *webview = _PTR(widget_ptr);
+	WebKitUserContentManager *manager = webkit_web_view_get_user_content_manager(webview);
+	if (manager == NULL)
+		return JNI_FALSE;
+
+	/* the handler must only be registered once per view, no matter how many interfaces are added */
+	if (g_object_get_data(G_OBJECT(manager), "atl-jsi-initialized") == NULL) {
+		g_object_set_data(G_OBJECT(manager), "atl-jsi-initialized", GINT_TO_POINTER(1));
+		webkit_user_content_manager_register_script_message_handler(manager, ATL_JSI_HANDLER_NAME);
+		g_signal_connect(G_OBJECT(manager), "script-message-received::" ATL_JSI_HANDLER_NAME, G_CALLBACK(script_message_received_cb), gtk_widget_get_parent(GTK_WIDGET(webview)));
+	}
+
+	char *name_str = _CSTRING(name);
+	char *escaped_name = escape_js_string_literal(name_str);
+
+	GString *script = g_string_new(NULL);
+	g_string_append(script, "(function(){\n");
+	g_string_append(script, "\tvar handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers[\"" ATL_JSI_HANDLER_NAME "\"];\n");
+	g_string_append(script, "\tif (!handler) return;\n");
+	g_string_append(script, "\tvar methods = [");
+	jsize method_count = (*env)->GetArrayLength(env, method_names);
+	for (jsize i = 0; i < method_count; i++) {
+		jstring method_name = (*env)->GetObjectArrayElement(env, method_names, i);
+		if (method_name == NULL)
+			continue;
+		char *method_str = _CSTRING(method_name);
+		char *escaped_method = escape_js_string_literal(method_str);
+		g_string_append_printf(script, "%s\"%s\"", i == 0 ? "" : ",", escaped_method);
+		g_free(escaped_method);
+		(*env)->ReleaseStringUTFChars(env, method_name, method_str);
+	}
+	g_string_append(script, "];\n");
+	g_string_append(script, "\tvar iface = {};\n");
+	g_string_append(script, "\tfor (var i = 0; i < methods.length; i++) {\n");
+	g_string_append(script, "\t\t(function(method) {\n");
+	g_string_append(script, "\t\t\tiface[method] = function() {\n");
+	g_string_append_printf(script, "\t\t\t\thandler.postMessage({\"name\": \"%s\", \"method\": method, \"args\": Array.prototype.slice.call(arguments)});\n", escaped_name);
+	g_string_append(script, "\t\t\t};\n");
+	g_string_append(script, "\t\t})(methods[i]);\n");
+	g_string_append(script, "\t}\n");
+	g_string_append_printf(script, "\twindow[\"%s\"] = iface;\n", escaped_name);
+	g_string_append(script, "})();\n");
+
+	WebKitUserScript *user_script = webkit_user_script_new(script->str, WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+	webkit_user_content_manager_add_script(manager, user_script);
+	webkit_user_script_unref(user_script);
+
+	g_string_free(script, TRUE);
+	g_free(escaped_name);
+	(*env)->ReleaseStringUTFChars(env, name, name_str);
+	return JNI_TRUE;
 }

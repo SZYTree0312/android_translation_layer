@@ -6,10 +6,17 @@ import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.ViewGroup;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
 	private ValueCallback evaluateJavascriptCallback;
+	private final Map<String, Object> javascriptInterfaces = new HashMap<String, Object>();
 
 	public WebView(Context context) {
 		this(context, null);
@@ -49,7 +56,30 @@ public class WebView extends ViewGroup {
 	public void setInitialScale(int scaleInPercent) {}
 
 	public void addJavascriptInterface(Object object, String name) {
-		// HACK: directly call onRenderingDone for OctoDroid, as the javascript interface is not implemented yet
+		javascriptInterfaces.put(name, object);
+
+		List<String> methodNames = new ArrayList<String>();
+		for (Method method : object.getClass().getMethods()) {
+			/*
+			 * android only exposes methods annotated with @JavascriptInterface, but a lot of apps
+			 * out there never got the memo, so we expose every public method instead. methods
+			 * inherited from Object are skipped, they are of no use to a page and would allow it
+			 * to get at the class of the injected object.
+			 */
+			if (method.getDeclaringClass() == Object.class)
+				continue;
+			if (!methodNames.contains(method.getName()))
+				methodNames.add(method.getName());
+		}
+
+		if (native_addJavascriptInterface(widget, name, methodNames.toArray(new String[methodNames.size()])))
+			return;
+
+		/*
+		 * HACK: the webview backend is disabled, so nothing will ever load the page and the
+		 * interface can not be called. directly call onRenderingDone for OctoDroid, which
+		 * otherwise waits for a callback that will never come.
+		 */
 		if (object.getClass().getName().startsWith("com.gh4a") && "NativeClient".equals(name)) {
 			try {
 				object.getClass().getMethod("onRenderingDone").invoke(object);
@@ -120,6 +150,62 @@ public class WebView extends ViewGroup {
 		}
 	}
 
+	// to be used by native code
+	void internalJavascriptInterfaceCall(String name, String methodName, Object[] args) {
+		Object object = javascriptInterfaces.get(name);
+		if (object == null)
+			return;
+
+		Method target = null;
+		for (Method method : object.getClass().getMethods()) {
+			if (!method.getName().equals(methodName))
+				continue;
+			if (method.getParameterTypes().length != args.length)
+				continue;
+			target = method;
+			break;
+		}
+		if (target == null) {
+			System.err.println("WebView: javascript interface " + name + " has no " + methodName + "/" + args.length);
+			return;
+		}
+
+		Class<?>[] parameterTypes = target.getParameterTypes();
+		Object[] convertedArgs = new Object[args.length];
+		for (int i = 0; i < args.length; i++)
+			convertedArgs[i] = convertJavascriptValue(args[i], parameterTypes[i]);
+
+		try {
+			target.invoke(object, convertedArgs);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/* javascript has a single number type, so narrow it down to whatever the method expects */
+	private static Object convertJavascriptValue(Object value, Class<?> target) {
+		if (value == null)
+			return null;
+		if (target == String.class)
+			return value.toString();
+		if (value instanceof Double) {
+			double number = (Double) value;
+			if (target == int.class || target == Integer.class)
+				return (int) number;
+			if (target == long.class || target == Long.class)
+				return (long) number;
+			if (target == float.class || target == Float.class)
+				return (float) number;
+			if (target == short.class || target == Short.class)
+				return (short) number;
+			if (target == byte.class || target == Byte.class)
+				return (byte) number;
+			if (target == boolean.class || target == Boolean.class)
+				return number != 0;
+		}
+		return value;
+	}
+
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
 
 	public void clearFormData() {}
@@ -142,4 +228,5 @@ public class WebView extends ViewGroup {
 	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);
 	private native void native_loadUrl(long widget, String url);
 	private native void native_evaluateJavascript(long widget, String script);
+	private native boolean native_addJavascriptInterface(long widget, String name, String[] methodNames);
 }

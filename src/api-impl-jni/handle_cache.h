@@ -141,6 +141,7 @@ struct handle_cache {
 		jmethodID internalGetAssetManager;
 		jmethodID internalLoadChanged;
 		jmethodID internalEvaluateJavascriptResult;
+		jmethodID internalJavascriptInterfaceCall;
 	} webview;
 	struct {
 		jclass class;
