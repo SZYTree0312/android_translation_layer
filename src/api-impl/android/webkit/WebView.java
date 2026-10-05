@@ -16,6 +16,7 @@ public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
 	private ValueCallback evaluateJavascriptCallback;
+	private WebSettings webSettings;
 	private final Map<String, Object> javascriptInterfaces = new HashMap<String, Object>();
 
 	public WebView(Context context) {
@@ -31,7 +32,10 @@ public class WebView extends ViewGroup {
 	}
 
 	public WebSettings getSettings() {
-		return new WebSettings();
+		/* android hands out the same settings object for every call, and so do we */
+		if (webSettings == null)
+			webSettings = new WebSettings(widget);
+		return webSettings;
 	}
 
 	public void setDownloadListener(DownloadListener downloadListener) {}
@@ -109,7 +113,7 @@ public class WebView extends ViewGroup {
 
 	public void loadUrl(String url) {
 		if (url.startsWith("javascript:")) {
-			System.out.println("loadUrl: " + url + " - not implemented yet");
+			evaluateJavascript(url.substring("javascript:".length()), null);
 			return;
 		}
 		native_loadUrl(widget, url);
