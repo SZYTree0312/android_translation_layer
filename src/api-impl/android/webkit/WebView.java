@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
+	private ValueCallback evaluateJavascriptCallback;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -105,7 +106,19 @@ public class WebView extends ViewGroup {
 		loadDataWithBaseURL("about:blank", data, mimeType, encoding, "about:blank");
 	}
 
-	public void evaluateJavascript(String script, ValueCallback resultCallback) {}
+	public void evaluateJavascript(String script, ValueCallback resultCallback) {
+		this.evaluateJavascriptCallback = resultCallback;
+		native_evaluateJavascript(widget, script);
+	}
+
+	// to be used by native code
+	void internalEvaluateJavascriptResult(String result) {
+		if (evaluateJavascriptCallback != null) {
+			ValueCallback callback = evaluateJavascriptCallback;
+			evaluateJavascriptCallback = null;
+			callback.onReceiveValue(result);
+		}
+	}
 
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
 
@@ -128,4 +141,5 @@ public class WebView extends ViewGroup {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);
 	private native void native_loadUrl(long widget, String url);
+	private native void native_evaluateJavascript(long widget, String script);
 }

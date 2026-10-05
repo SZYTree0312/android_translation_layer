@@ -1,6 +1,7 @@
 #include <gio/gunixinputstream.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
+#include <jsc/jsc.h>
 
 #include <androidfw/androidfw_c_api.h>
 
@@ -75,4 +76,34 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(J
 	char *data = malloc(data_len + 1); // + 1 for NUL
 	(*env)->GetStringUTFRegion(env, data_jstr, 0, data_jlen, data);
 	webkit_web_view_load_bytes(webview, g_bytes_new(data, data_len), mime_type ? _CSTRING(mime_type) : "text/html", encoding ? _CSTRING(encoding) : NULL, base_url ? _CSTRING(base_url) : NULL);
+}
+
+static void evaluate_javascript_finished_cb(GObject *object, GAsyncResult *result, gpointer user_data)
+{
+	WebKitWebView *web_view = WEBKIT_WEB_VIEW(object);
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
+	JNIEnv *env = get_jni_env();
+
+	WebKitJavascriptResult *js_result = webkit_web_view_evaluate_javascript_finish(web_view, result, NULL);
+	if (js_result == NULL) {
+		(*env)->CallVoidMethod(env, wrapper->jobj, handle_cache.webview.internalEvaluateJavascriptResult, NULL);
+		return;
+	}
+
+	JSCValue *value = webkit_javascript_result_get_js_value(js_result);
+	char *value_str = jsc_value_to_string(value);
+	(*env)->CallVoidMethod(env, wrapper->jobj, handle_cache.webview.internalEvaluateJavascriptResult, _JSTRING(value_str));
+	g_free(value_str);
+	webkit_javascript_result_unref(js_result);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JNIEnv *env, jobject this, jlong widget_ptr, jstring script)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+
+	WebKitWebView *webview = _PTR(widget_ptr);
+	const char *script_str = _CSTRING(script);
+	webkit_web_view_evaluate_javascript(webview, script_str, -1, NULL, NULL, NULL, evaluate_javascript_finished_cb, NULL);
+	(*env)->ReleaseStringUTFChars(env, script, script_str);
 }

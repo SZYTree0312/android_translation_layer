@@ -251,6 +251,14 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_evaluateJavascript
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript
+  (JNIEnv *, jobject, jlong, jstring);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_loadDataWithBaseURL
  * Signature: (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
  */
