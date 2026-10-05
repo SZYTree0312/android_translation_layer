@@ -19,6 +19,8 @@ public abstract class AbsSeekBar extends ProgressBar {
 		return new Drawable();
 	}
 
+	public void setThumb(Drawable thumb) {}
+
 	public void setKeyProgressIncrement(int keyProgressIncrement) {}
 
 	public int getKeyProgressIncrement() { return 0; }
