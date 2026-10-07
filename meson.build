@@ -44,6 +44,12 @@ unifiedpush_connector = gnome.gdbus_codegen('unifiedpush-connector',
                                             'src/api-impl-jni/content/org.unifiedpush.Connector1.xml',
                                             interface_prefix: 'org.unifiedpush')
 
+# Debian ships the pkg-config file as javascriptcoregtk-6.0, other distros may call it jsc-6.0
+jsc_dep = dependency('javascriptcoregtk-6.0', required : false)
+if not jsc_dep.found()
+  jsc_dep = dependency('jsc-6.0')
+endif
+
 extra_deps = []
 extra_jni_srcs = []
 
@@ -186,7 +192,9 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
-                                                                  	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('jsc-6.0'), dependency('libsecret-1'),
+                                                                  	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), jsc_dep, dependency('libsecret-1'),
+                                                                        # for gio/gunixinputstream.h, used by the webview asset scheme handler
+                                                                        dependency('gio-unix-2.0'),
                                                                         libart_dep, wayland_protos_dep
                                                                   ],
                                                                   link_with: [ libandroid_so ],

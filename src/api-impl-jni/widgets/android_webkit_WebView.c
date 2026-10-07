@@ -86,23 +86,53 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(J
 	webkit_web_view_load_bytes(webview, g_bytes_new(data, data_len), mime_type ? _CSTRING(mime_type) : "text/html", encoding ? _CSTRING(encoding) : NULL, base_url ? _CSTRING(base_url) : NULL);
 }
 
+/*
+ * WebKitGTK 2.54 dropped WebKitJavascriptResult: both the async result of
+ * webkit_web_view_evaluate_javascript and the script-message-received signal
+ * now hand out a JSCValue directly. These wrappers keep us building against
+ * both the old and the new API.
+ */
+#if WEBKIT_CHECK_VERSION(2, 54, 0)
+typedef JSCValue ATLJavascriptResult;
+
+static JSCValue *atl_javascript_result_get_value(JSCValue *result)
+{
+	return result;
+}
+static void atl_javascript_result_unref(JSCValue *result)
+{
+	g_object_unref(result);
+}
+#else
+typedef WebKitJavascriptResult ATLJavascriptResult;
+
+static JSCValue *atl_javascript_result_get_value(WebKitJavascriptResult *result)
+{
+	return webkit_javascript_result_get_js_value(result);
+}
+static void atl_javascript_result_unref(WebKitJavascriptResult *result)
+{
+	webkit_javascript_result_unref(result);
+}
+#endif
+
 static void evaluate_javascript_finished_cb(GObject *object, GAsyncResult *result, gpointer user_data)
 {
 	WebKitWebView *web_view = WEBKIT_WEB_VIEW(object);
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
 	JNIEnv *env = get_jni_env();
 
-	WebKitJavascriptResult *js_result = webkit_web_view_evaluate_javascript_finish(web_view, result, NULL);
+	ATLJavascriptResult *js_result = webkit_web_view_evaluate_javascript_finish(web_view, result, NULL);
 	if (js_result == NULL) {
 		(*env)->CallVoidMethod(env, wrapper->jobj, handle_cache.webview.internalEvaluateJavascriptResult, NULL);
 		return;
 	}
 
-	JSCValue *value = webkit_javascript_result_get_js_value(js_result);
+	JSCValue *value = atl_javascript_result_get_value(js_result);
 	char *value_str = jsc_value_to_string(value);
 	(*env)->CallVoidMethod(env, wrapper->jobj, handle_cache.webview.internalEvaluateJavascriptResult, _JSTRING(value_str));
 	g_free(value_str);
-	webkit_javascript_result_unref(js_result);
+	atl_javascript_result_unref(js_result);
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JNIEnv *env, jobject this, jlong widget_ptr, jstring script)
@@ -147,11 +177,11 @@ static jobject js_value_to_java_object(JNIEnv *env, JSCValue *value)
 	return result;
 }
 
-static void script_message_received_cb(WebKitUserContentManager *manager, WebKitJavascriptResult *result, gpointer user_data)
+static void script_message_received_cb(WebKitUserContentManager *manager, ATLJavascriptResult *result, gpointer user_data)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(user_data);
 	JNIEnv *env = get_jni_env();
-	JSCValue *message = webkit_javascript_result_get_js_value(result);
+	JSCValue *message = atl_javascript_result_get_value(result);
 	if (!jsc_value_is_object(message))
 		return;
 
@@ -235,11 +265,18 @@ JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1addJavascriptInte
 	if (manager == NULL)
 		return JNI_FALSE;
 
-	/* the handler must only be registered once per view, no matter how many interfaces are added */
+	/*
+	 * the handler must only be registered once per view, no matter how many interfaces are added.
+	 * webkit wants us connected before registering the name, otherwise we can miss messages.
+	 */
 	if (g_object_get_data(G_OBJECT(manager), "atl-jsi-initialized") == NULL) {
 		g_object_set_data(G_OBJECT(manager), "atl-jsi-initialized", GINT_TO_POINTER(1));
-		webkit_user_content_manager_register_script_message_handler(manager, ATL_JSI_HANDLER_NAME);
 		g_signal_connect(G_OBJECT(manager), "script-message-received::" ATL_JSI_HANDLER_NAME, G_CALLBACK(script_message_received_cb), gtk_widget_get_parent(GTK_WIDGET(webview)));
+#if WEBKIT_CHECK_VERSION(2, 40, 0)
+		webkit_user_content_manager_register_script_message_handler(manager, ATL_JSI_HANDLER_NAME, NULL);
+#else
+		webkit_user_content_manager_register_script_message_handler(manager, ATL_JSI_HANDLER_NAME);
+#endif
 	}
 
 	char *name_str = _CSTRING(name);
